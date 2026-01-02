@@ -1,0 +1,23 @@
+*.tfstate
+*.tfstate.backup
+.terraform/
+*.tfvars
+.terraform.lock.hcl
+
+# Secrets
+*password*
+*secret*
+*.key
+*.pem
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data
+data/
+*.sqlite
+*.db
