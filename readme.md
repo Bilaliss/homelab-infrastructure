@@ -288,10 +288,10 @@ MIT License - feel free to use this as inspiration for your own homelab!
 
 ## 📧 Contact
 
-**Bilal** - DevOps Engineer  
-📧 Email: tua-email@esempio.com  
-💼 LinkedIn: [linkedin.com/in/tuoprofile](https://linkedin.com/in/tuoprofile)  
-🌐 Portfolio: [tuosito.com](https://tuosito.com)
+**Bilal** - Almost a DevOps Engineer  
+📧 Email: bilalis@hotmail.it  
+💼 LinkedIn: (https://linkedin.com/in/bilal-ismail-b1161758)  
+
 
 ---
 
