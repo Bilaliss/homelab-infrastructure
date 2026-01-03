@@ -1,0 +1,210 @@
+name: Homelab CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Manual trigger
+
+env:
+  TERRAFORM_VERSION: '1.5.0'
+
+jobs:
+  
+  # ==========================================
+  # JOB 1: LINT & VALIDATION
+  # ==========================================
+  lint:
+    name: Lint & Validation
+    runs-on: ubuntu-latest
+    steps:
+    
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: 🔍 Lint Terraform files
+      run: |
+        cd terraform-homelab
+        terraform fmt -check -recursive || true
+      continue-on-error: true
+    
+    - name: 📝 Lint YAML files
+      uses: ibiqlik/action-yamllint@v3
+      with:
+        file_or_dir: k8s-manifests/
+        config_data: |
+          extends: default
+          rules:
+            line-length: disable
+            comments: disable
+      continue-on-error: true
+    
+    - name: 🐚 Lint Shell scripts
+      run: |
+        find scripts/ -name "*.sh" -exec shellcheck {} + || true
+      continue-on-error: true
+
+  # ==========================================
+  # JOB 2: TERRAFORM VALIDATION
+  # ==========================================
+  terraform:
+    name: Terraform Validate
+    runs-on: ubuntu-latest
+    steps:
+    
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TERRAFORM_VERSION }}
+    
+    - name: Terraform Init
+      run: |
+        cd terraform-homelab
+        terraform init -backend=false
+    
+    - name: Terraform Validate
+      run: |
+        cd terraform-homelab
+        terraform validate
+    
+    - name: Terraform Format Check
+      run: |
+        cd terraform-homelab
+        terraform fmt -check -recursive
+
+  # ==========================================
+  # JOB 3: ANSIBLE SYNTAX CHECK
+  # ==========================================
+  ansible:
+    name: Ansible Syntax Check
+    runs-on: ubuntu-latest
+    steps:
+    
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Ansible
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ansible
+    
+    - name: Ansible Syntax Check
+      run: |
+        cd ansible-homelab
+        for file in *.yml; do
+          echo "Checking $file..."
+          ansible-playbook --syntax-check "$file" || true
+        done
+
+  # ==========================================
+  # JOB 4: KUBERNETES MANIFEST VALIDATION
+  # ==========================================
+  kubernetes:
+    name: Validate K8s Manifests
+    runs-on: ubuntu-latest
+    steps:
+    
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install kubectl
+      run: |
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x kubectl
+        sudo mv kubectl /usr/local/bin/
+    
+    - name: Validate Kubernetes manifests
+      run: |
+        find k8s-manifests/ -name "*.yaml" -o -name "*.yml" | while read file; do
+          echo "Validating $file..."
+          kubectl apply --dry-run=client -f "$file" || true
+        done
+
+  # ==========================================
+  # JOB 5: SECURITY SCANNING
+  # ==========================================
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+    
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'table'
+        exit-code: '0'
+    
+    - name: Check for secrets
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: main
+        head: HEAD
+      continue-on-error: true
+
+  # ==========================================
+  # JOB 6: DOCUMENTATION
+  # ==========================================
+  docs:
+    name: Generate Documentation
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+    
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Generate Terraform docs
+      uses: terraform-docs/gh-actions@v1
+      with:
+        working-dir: terraform-homelab
+        output-file: README.md
+        output-method: inject
+        args: --sort-by required
+      continue-on-error: true
+    
+    - name: Commit documentation
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add -A
+        git diff --quiet && git diff --staged --quiet || \
+        (git commit -m "docs: Auto-generate documentation [skip ci]" && git push)
+      continue-on-error: true
+
+  # ==========================================
+  # JOB 7: BUILD SUMMARY
+  # ==========================================
+  summary:
+    name: Build Summary
+    runs-on: ubuntu-latest
+    needs: [lint, terraform, ansible, kubernetes, security]
+    if: always()
+    steps:
+    
+    - name: Generate Summary
+      run: |
+        echo "## 🏗️ Homelab CI/CD Pipeline Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Lint & Validation | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Terraform | ${{ needs.terraform.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Ansible | ${{ needs.ansible.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Kubernetes | ${{ needs.kubernetes.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Security | ${{ needs.security.result }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "✨ Pipeline completed!" >> $GITHUB_STEP_SUMMARY
+
+

@@ -1,0 +1,48 @@
+name: Deploy to Homelab
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - staging
+
+jobs:
+  deploy:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    steps:
+    
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: 🚀 Deploy Notification
+      run: |
+        echo "## 🚀 Deploying to Homelab" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment:** ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📦 Would deploy:" >> $GITHUB_STEP_SUMMARY
+        echo "- Terraform infrastructure" >> $GITHUB_STEP_SUMMARY
+        echo "- Kubernetes manifests" >> $GITHUB_STEP_SUMMARY
+        echo "- Ansible configurations" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "> ℹ️ Note: Actual deployment requires self-hosted runner on Raspberry Pi" >> $GITHUB_STEP_SUMMARY
+    
+    - name: Show deployment files
+      run: |
+        echo "Terraform modules:"
+        find terraform-homelab -name "*.tf" | head -10
+        echo ""
+        echo "Kubernetes manifests:"
+        find k8s-manifests -name "*.yaml" | head -10
+        echo ""
+        echo "Ansible playbooks:"
+        find ansible-homelab -name "*.yml" | head -10

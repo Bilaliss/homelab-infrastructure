@@ -1,0 +1,29 @@
+name: Update Badges
+
+on:
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+    
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Count files
+      id: count
+      run: |
+        echo "terraform=$(find terraform-homelab -name '*.tf' | wc -l)" >> $GITHUB_OUTPUT
+        echo "k8s=$(find k8s-manifests -name '*.yaml' -o -name '*.yml' | wc -l)" >> $GITHUB_OUTPUT
+        echo "ansible=$(find ansible-homelab -name '*.yml' | wc -l)" >> $GITHUB_OUTPUT
+    
+    - name: Generate report
+      run: |
+        echo "📊 Repository Statistics:" >> $GITHUB_STEP_SUMMARY
+        echo "- Terraform files: ${{ steps.count.outputs.terraform }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Kubernetes manifests: ${{ steps.count.outputs.k8s }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Ansible playbooks: ${{ steps.count.outputs.ansible }}" >> $GITHUB_STEP_SUMMARY
